@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Sistema de Inventarios y Costos – Choclo Hualtaco</title>
+<style>
+:root{--bg:#eef3ea;--cd:#fff;--tx:#1b2a1f;--mu:#5b6b5f;--bd:#d0dccb;--g:#14532d;--bad:#b42318;--ok:#157f3b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1a12;--cd:#18261c;--tx:#e8f0e9;--mu:#9db0a1;--bd:#2c4033;--g:#1f7a45;--bad:#ff8a80;--ok:#6fdc97}}
+:root[data-theme="dark"]{--bg:#0f1a12;--cd:#18261c;--tx:#e8f0e9;--mu:#9db0a1;--bd:#2c4033;--g:#1f7a45;--bad:#ff8a80;--ok:#6fdc97}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.w{max-width:960px;margin:0 auto;padding:14px}
+h1{font-size:1.25rem;margin:4px 0 2px}h2{font-size:1.05rem;margin:0 0 10px}
+.mu{color:var(--mu);font-size:.85rem}
+#nav{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:14px 0}
+@media(min-width:700px){#nav{grid-template-columns:repeat(4,1fr)}}
+.nb,.btn{background:var(--g);color:#fff;border:2px solid var(--g);border-radius:10px;padding:10px 8px;font:inherit;font-weight:600;cursor:pointer}
+.nb.on{border-color:#f5c542;box-shadow:0 0 0 3px #f5c54255}
+.btn.o{background:none;color:var(--tx);border-color:var(--bd)}
+.card{background:var(--cd);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:12px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px}
+label{font-size:.8rem;color:var(--mu);display:flex;flex-direction:column;gap:3px}
+input,select,textarea{font:inherit;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
+.kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+.k{background:var(--cd);border:1px solid var(--bd);border-radius:12px;padding:10px}.k small{display:block;color:var(--mu)}.k b{font-size:1.05rem}
+.k.ok b{color:var(--ok)}.k.bad b,td.bad{color:var(--bad)}
+.sc{overflow-x:auto;margin-bottom:12px}table{border-collapse:collapse;width:100%;background:var(--cd);font-size:.9rem}
+th,td{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}th{background:var(--g);color:#fff}
+.x{background:none;border:0;color:var(--bad);cursor:pointer;font-size:1rem}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:#222;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:9}
+@media print{#nav,.np,#toast{display:none!important}body{background:#fff;color:#000}}
+</style></head><body>
+<div class="w"><h1>🌽 Sistema de Inventarios y Costos de Producción</h1>
+<div class="mu">Choclo hualtaco · Comunidad Sexta Parte, Vinto · U.E. Técnico Humanístico “María Ayma” – BTH 2026</div>
+<div id="nav" class="np"></div><div id="v"></div></div><div id="toast"></div>
+<script>
+const TABS=['Resumen Cliente y Ganancias','Costos de Sembrado','Clasificación Choclo','Kardex Choclo Grande','Kardex Choclo Mediano','Kardex Choclo Pequeño','Kardex Choclo Menudo'];
+const CAL=['Grande','Mediano','Pequeño','Menudo'],CAT=['Semilla','Abono','Fertilizante','Jornal','Otro'];
+let S={cfg:{prod:'',unit:'cien'},costos:[],mov:[]},tab=0,seq=Date.now(),tt,rz=0;
+try{const r=localStorage.getItem('choclo_v1');if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const save=()=>{try{localStorage.setItem('choclo_v1',JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id),num=id=>parseFloat($(id).value)||0;
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const f=n=>Number(n||0).toLocaleString('es-BO',{minimumFractionDigits:2,maximumFractionDigits:2});
+const today=()=>new Date().toISOString().slice(0,10);
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(tt);tt=setTimeout(()=>t.style.display='none',2800)}
+const k=(l,v,c='')=>`<div class="k ${c}"><small>${l}</small><b>${v}</b></div>`;
+const tbl=(h,r)=>r?`<div class="sc"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r}</table></div>`:'<p class="mu">Todavía no hay registros.</p>';
+function calc(){const tc=S.costos.reduce((a,c)=>a+c.cant*c.pu,0),q=CAL.map(n=>({n,e:0,v:0,m:0,ing:0}));
+S.mov.forEach(m=>{const o=q[m.cal];if(m.t=='E')o.e+=m.cant;else if(m.t=='V'){o.v+=m.cant;o.ing+=m.cant*m.pu}else o.m+=m.cant});
+q.forEach(o=>o.s=o.e-o.v-o.m);const sm=x=>q.reduce((a,o)=>a+o[x],0),E=sm('e'),V=sm('v'),M=sm('m'),ING=sm('ing'),cu=E?tc/E:0;
+return{tc,q,E,V,M,ING,cu,cm:M*cu,ut:ING-(V+M)*cu,pmin:E-M>0?tc/(E-M):0,S:E-V-M}}
+function nav(){$('nav').innerHTML=TABS.map((t,i)=>`<button class="nb${i==tab?' on':''}" onclick="go(${i})">${t}</button>`).join('')}
+function go(i){tab=i;nav();view();scrollTo(0,0)}
+function view(){$('v').innerHTML=[rRes,rCos,rCla,()=>rKar(0),()=>rKar(1),()=>rKar(2),()=>rKar(3)][tab]()}
+function cfg(){S.cfg.prod=$('cp').value;S.cfg.unit=$('cun').value.trim()||'cien';save();view()}
+function del(id){S.costos=S.costos.filter(x=>x.id!=id);S.mov=S.mov.filter(x=>x.id!=id);save();view()}
+function rRes(){const c=calc(),u=S.cfg.unit,cl={};
+S.mov.filter(m=>m.t=='V').forEach(m=>{const n=m.cli||'Sin nombre';cl[n]=cl[n]||{q:0,b:0};cl[n].q+=m.cant;cl[n].b+=m.cant*m.pu});
+const rc=c.q.map(o=>`<tr><td>${o.n}</td><td>${o.e}</td><td>${o.v}</td><td>${o.m}</td><td><b>${o.s}</b></td><td>${f(o.ing)}</td><td>${f(o.s*c.cu)}</td></tr>`).join('')+`<tr><th>Total</th><th>${c.E}</th><th>${c.V}</th><th>${c.M}</th><th>${c.S}</th><th>${f(c.ING)}</th><th>${f(c.S*c.cu)}</th></tr>`;
+const rl=Object.entries(cl).map(([n,o])=>`<tr><td>${esc(n)}</td><td>${o.q}</td><td>${f(o.b)}</td></tr>`).join('');
+return`<div class="card"><h2>Datos del reporte</h2><div class="row"><label>Productor o cliente<input id="cp" value="${esc(S.cfg.prod)}" onchange="cfg()" placeholder="Nombre"></label><label>Unidad de venta (cien, cuarta, bolsa…)<input id="cun" value="${esc(u)}" onchange="cfg()"></label></div></div>
+<div class="kp">${k('Ingresos por ventas','Bs '+f(c.ING))}${k('Costo total de producción','Bs '+f(c.tc))}${k('Costo por '+esc(u),'Bs '+f(c.cu))}${k('Pérdida por mermas',c.M+' '+esc(u)+' · Bs '+f(c.cm),c.M?'bad':'')}${k('Precio mínimo para no perder','Bs '+f(c.pmin)+' / '+esc(u))}${k('Utilidad neta real','Bs '+f(c.ut),c.ut<0?'bad':'ok')}</div>
+<p class="mu">Precio mínimo = costo total ÷ (cosechado − mermas). Utilidad neta = ventas − costo de lo vendido − costo de las mermas. Cantidades en ${esc(u)}.</p>
+<h2>Inventario por calidad</h2>${tbl(['Calidad','Cosechado','Vendido','Merma','Stock','Ingresos Bs','Stock valorado Bs'],rc)}
+<h2>Ventas por cliente</h2>${tbl(['Cliente','Cantidad','Total Bs'],rl)}
+<details class="card np"><summary>Copia de seguridad y borrado</summary><p class="mu">Tus datos se guardan en este navegador. Copia este texto y guárdalo (WhatsApp, Drive); para restaurar, pégalo abajo.</p>
+<textarea rows="3" readonly onclick="this.select()">${esc(JSON.stringify(S))}</textarea><p></p><textarea id="rs" rows="3" placeholder="Pega aquí la copia"></textarea><p><button class="btn" onclick="rest()">Restaurar copia</button> <button class="btn o" onclick="borrar(this)">Borrar todos los datos</button></p></details>`}
+function rest(){try{const d=JSON.parse($('rs').value);if(!d.mov||!d.costos)throw 0;S={cfg:Object.assign({prod:'',unit:'cien'},d.cfg),costos:d.costos,mov:d.mov};save();view();toast('Copia restaurada')}catch(e){toast('El texto no es una copia válida')}}
+function borrar(b){if(!rz){rz=1;b.textContent='¿Seguro? Toca otra vez para borrar';setTimeout(()=>{rz=0;b.textContent='Borrar todos los datos'},4000);return}S={cfg:{prod:'',unit:'cien'},costos:[],mov:[]};save();rz=0;view()}
+function rCos(){const by={};S.costos.forEach(c=>by[c.cat]=(by[c.cat]||0)+c.cant*c.pu);
+const r=S.costos.slice().sort((a,b)=>a.fecha<b.fecha?1:-1).map(c=>`<tr><td>${c.fecha}</td><td>${c.cat}</td><td>${esc(c.det)}</td><td>${c.cant}</td><td>${f(c.pu)}</td><td>${f(c.cant*c.pu)}</td><td><button class="x" onclick="del(${c.id})">✕</button></td></tr>`).join('');
+return`<div class="card"><h2>Anotar gasto del campo</h2><div class="row"><label>Fecha<input type="date" id="cf" value="${today()}"></label><label>Tipo<select id="cc">${CAT.map(x=>`<option>${x}</option>`).join('')}</select></label><label>Detalle<input id="cd" placeholder="Ej: semilla hualtaco"></label><label>Cantidad<input type="number" id="cq" value="1" min="0" step="any"></label><label>Precio unitario (Bs)<input type="number" id="cpu" min="0" step="any"></label></div><button class="btn" onclick="addC()">Agregar gasto</button></div>
+<div class="kp">${CAT.map(x=>k(x,'Bs '+f(by[x]))).join('')}${k('Total invertido','Bs '+f(calc().tc),'ok')}</div>${tbl(['Fecha','Tipo','Detalle','Cant.','P. unit.','Total Bs',''],r)}`}
+function addC(){const cant=num('cq'),pu=num('cpu');if(cant<=0||pu<=0)return toast('Escribe cantidad y precio mayores a cero');
+S.costos.push({id:++seq,fecha:$('cf').value||today(),cat:$('cc').value,det:$('cd').value,cant,pu});save();view();toast('Gasto agregado')}
+function rCla(){const r=S.mov.filter(m=>m.t=='E').sort((a,b)=>a.fecha<b.fecha?1:-1).map(m=>`<tr><td>${m.fecha}</td><td>${CAL[m.cal]}</td><td>${m.cant}</td><td><button class="x" onclick="del(${m.id})">✕</button></td></tr>`).join('');
+return`<div class="card"><h2>Registrar cosecha clasificada (en ${esc(S.cfg.unit)})</h2><div class="row"><label>Fecha<input type="date" id="qf" value="${today()}"></label>${CAL.map((n,i)=>`<label>${n}<input type="number" id="q${i}" min="0" step="any" placeholder="0"></label>`).join('')}</div><button class="btn" onclick="addE()">Registrar cosecha</button><p class="mu">Lo que anotes aquí entra solo como “Entrada” al kárdex de cada calidad.</p></div>${tbl(['Fecha','Calidad','Cantidad',''],r)}`}
+function addE(){let n=0;CAL.forEach((_,i)=>{const q=num('q'+i);if(q>0){S.mov.push({id:++seq,fecha:$('qf').value||today(),cal:i,t:'E',cant:q});n++}});if(!n)return toast('Escribe al menos una cantidad');save();view();toast('Cosecha registrada')}
+function rKar(i){const c=calc(),o=c.q[i],u=S.cfg.unit;let s=0;
+const r=S.mov.filter(m=>m.cal==i).sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:a.id-b.id).map(m=>{const e=m.t=='E'?m.cant:0,x=m.t=='E'?0:m.cant;s+=e-x;
+return`<tr><td>${m.fecha}</td><td>${{E:'Entrada (cosecha)',V:'Venta'+(m.cli?' · '+esc(m.cli):''),M:'Merma (secado)'}[m.t]}</td><td>${e||''}</td><td>${x||''}</td><td class="${s<0?'bad':''}"><b>${s}</b></td><td>${m.t=='V'?f(m.pu):''}</td><td>${m.t=='V'?f(m.cant*m.pu):''}</td><td><button class="x" onclick="del(${m.id})">✕</button></td></tr>`}).join('');
+return`<div class="card"><h2>Anotar salida de choclo ${CAL[i].toLowerCase()}</h2><div class="row"><label>Tipo<select id="kt"><option value="V">Venta</option><option value="M">Merma (seco o arruinado)</option></select></label><label>Fecha<input type="date" id="kf" value="${today()}"></label><label>Cantidad (${esc(u)})<input type="number" id="kq" min="0" step="any"></label><label>Precio por ${esc(u)} (Bs)<input type="number" id="kp" min="0" step="any"></label><label>Cliente (solo venta)<input id="kc"></label></div><button class="btn" onclick="addM(${i})">Guardar movimiento</button></div>
+<div class="kp">${k('Entradas',o.e)}${k('Ventas',o.v)}${k('Mermas',o.m,o.m?'bad':'')}${k('Stock actual',o.s,'ok')}${k('Costo unitario','Bs '+f(c.cu))}${k('Stock valorado','Bs '+f(o.s*c.cu))}</div>${tbl(['Fecha','Detalle','Entra','Sale','Saldo','Precio','Total Bs',''],r)}`}
+function addM(i){const t=$('kt').value,q=num('kq'),pu=num('kp'),st=calc().q[i].s;if(q<=0)return toast('Escribe una cantidad mayor a cero');if(q>st)return toast('No hay tanto stock: quedan '+st);if(t=='V'&&pu<=0)return toast('Escribe el precio de venta');
+S.mov.push({id:++seq,fecha:$('kf').value||today(),cal:i,t,cant:q,pu:t=='V'?pu:0,cli:t=='V'?$('kc').value.trim():''});save();view();toast('Movimiento guardado')}
+nav();view();
+</script></body></html>
